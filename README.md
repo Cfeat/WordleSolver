@@ -4,7 +4,7 @@
 
 ## 功能
 
-- **可视化网页** (`web`)：棋盘辅助猜词、熵推荐图、候选收缩、模拟分布
+- **可视化网页** (`web`)：棋盘辅助猜词、题库对战（手猜/系统代猜）、熵推荐图、模拟分布
 - **交互辅助** (`play`)：命令行根据颜色反馈推荐下一步
 - **自动求解** (`auto`)：对指定答案走出完整猜词路径
 - **批量模拟** (`simulate`)：在全部答案词上统计胜率与平均步数
@@ -17,8 +17,12 @@
 ```bash
 pip install -r requirements.txt
 
-# 可视化界面（浏览器打开提示的地址）
+# 可视化界面（浏览器打开提示的地址，含「题库对战」）
 python main.py web
+
+# 命令行题库对战
+python main.py challenge
+python main.py challenge --auto      # 系统自动通关
 
 # 交互辅助（普通模式）
 python main.py play

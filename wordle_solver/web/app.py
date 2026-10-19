@@ -8,6 +8,7 @@ from pathlib import Path
 
 from flask import Flask, jsonify, render_template, request, session
 
+from wordle_solver.challenge import ChallengeGame
 from wordle_solver.feedback import colors_to_pattern, pattern_to_colors
 from wordle_solver.game import simulate
 from wordle_solver.hard_mode import is_hard_valid
@@ -16,8 +17,10 @@ from wordle_solver.solver import Solver
 TEMPLATES = Path(__file__).parent / "templates"
 STATIC = Path(__file__).parent / "static"
 
-# In-memory sessions: sid -> Solver
+# In-memory sessions: sid -> Solver (helper mode)
 _SESSIONS: dict[str, Solver] = {}
+# Challenge mode: gid -> ChallengeGame
+_GAMES: dict[str, ChallengeGame] = {}
 
 
 def create_app() -> Flask:
@@ -171,10 +174,76 @@ def create_app() -> Flask:
             }
         )
 
+    def _game() -> ChallengeGame | None:
+        gid = session.get("gid")
+        if not gid:
+            return None
+        return _GAMES.get(gid)
+
+    def _require_game() -> tuple[ChallengeGame | None, tuple | None]:
+        game = _game()
+        if game is None:
+            return None, (jsonify({"error": "还没有对局，请先抽题"}), 400)
+        return game, None
+
+    @app.post("/api/game/new")
+    def api_game_new():
+        data = request.get_json(silent=True) or {}
+        hard = bool(data.get("hard", False))
+        # Ensure opener cache exists once, before creating the game (avoids long stall in draw).
+        warm = Solver(hard_mode=False)
+        _ensure_opener(warm)
+        gid = uuid.uuid4().hex
+        session["gid"] = gid
+        game = ChallengeGame.draw(hard_mode=hard)
+        _GAMES[gid] = game
+        return jsonify(game.snapshot())
+
+    @app.get("/api/game/state")
+    def api_game_state():
+        game = _game()
+        if game is None:
+            return jsonify({"active": False})
+        snap = game.snapshot()
+        snap["active"] = True
+        return jsonify(snap)
+
+    @app.post("/api/game/guess")
+    def api_game_guess():
+        game, err = _require_game()
+        if err:
+            return err
+        data = request.get_json(force=True)
+        result = game.submit(str(data.get("guess", "")))
+        if "error" in result:
+            return jsonify(result), 400
+        return jsonify(game.snapshot())
+
+    @app.post("/api/game/auto-step")
+    def api_game_auto_step():
+        game, err = _require_game()
+        if err:
+            return err
+        result = game.auto_step()
+        if "error" in result:
+            return jsonify(result), 400
+        return jsonify(game.snapshot())
+
+    @app.post("/api/game/auto-all")
+    def api_game_auto_all():
+        game, err = _require_game()
+        if err:
+            return err
+        result = game.auto_all()
+        if "error" in result:
+            return jsonify(result), 400
+        return jsonify(game.snapshot())
+
     return app
 
 
 def run(host: str = "127.0.0.1", port: int = 5000, debug: bool = False) -> None:
     app = create_app()
     print(f"WordleSolver 可视化: http://{host}:{port}")
-    app.run(host=host, port=port, debug=debug)
+    # threaded=True: page-load helper ranking must not block 题库抽题.
+    app.run(host=host, port=port, debug=debug, threaded=True)

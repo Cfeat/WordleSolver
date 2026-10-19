@@ -327,6 +327,23 @@ main {
   font-size: 0.85rem;
 }
 
+.game-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.75rem;
+}
+
+.game-actions .ghost {
+  flex: 1;
+  min-width: 7.5rem;
+  text-align: center;
+}
+
+.status.lost {
+  color: #b45309;
+}
+
 .side h2,
 .sim-card h2 {
   margin: 0;

@@ -54,19 +54,14 @@ class Solver:
             w = self.candidates[0]
             return [(w, 0.0, True)]
 
-        # First move is identical with/without Hard Mode (no constraints yet).
+        # First move: always use opener cache (never re-rank the full list online).
         if not self.history:
-            opener = self._cached_opener()
-            if opener and top_k <= 1:
-                ent = self._entropy(opener, self.candidates)
-                return [(opener, ent, opener in self._answer_set)]
-            # Rank answer pool for a fast top-K list (full guess pool is slow).
-            scored = self._rank(list(self.answers), self.candidates)
-            if opener:
-                scored = [s for s in scored if s[0] != opener]
-                ent = self._entropy(opener, self.candidates)
-                scored.insert(0, (opener, ent, opener in self._answer_set))
-            return scored[:top_k]
+            cached = self._cached_opener_list(top_k)
+            if cached:
+                return cached
+            opener = self.compute_and_cache_opener(use_full_pool=False)
+            ent = self._entropy(opener, self.candidates)
+            return [(opener, ent, opener in self._answer_set)][:top_k]
 
         pool = self._guess_pool()
         scored = self._rank(pool, self.candidates)
@@ -132,12 +127,36 @@ class Solver:
             return data.get("opener")
         return None
 
+    def _cached_opener_list(
+        self, top_k: int
+    ) -> list[tuple[str, float, bool]] | None:
+        if not CACHE_PATH.exists():
+            return None
+        data = json.loads(CACHE_PATH.read_text(encoding="utf-8"))
+        rows = data.get("top")
+        if not rows:
+            opener = data.get("opener")
+            if not opener:
+                return None
+            ent = float(data.get("entropy") or self._entropy(opener, self.candidates))
+            return [(opener, ent, bool(data.get("is_answer", True)))][:top_k]
+        out: list[tuple[str, float, bool]] = []
+        for row in rows[:top_k]:
+            out.append(
+                (row["word"], float(row["entropy"]), bool(row.get("is_answer", True)))
+            )
+        return out
+
     def compute_and_cache_opener(self, use_full_pool: bool = True) -> str:
-        """Compute best first guess and save to cache (slow once)."""
+        """Compute best first guess (+ top list) and save to cache (slow once)."""
         pool = list(self.all_guesses) if use_full_pool else list(self.answers)
         print(f"计算最佳开局词（候选答案 {len(self.answers)}，猜测池 {len(pool)}）…")
-        best = self._rank(pool, self.answers)[0]
-        word, ent, in_set = best
+        ranked = self._rank(pool, self.answers)
+        word, ent, in_set = ranked[0]
+        top = [
+            {"word": w, "entropy": e, "is_answer": bool(ins)}
+            for w, e, ins in ranked[:8]
+        ]
         CACHE_PATH.write_text(
             json.dumps(
                 {
@@ -146,6 +165,7 @@ class Solver:
                     "is_answer": in_set,
                     "answer_count": len(self.answers),
                     "guess_pool": len(pool),
+                    "top": top,
                 },
                 indent=2,
             ),

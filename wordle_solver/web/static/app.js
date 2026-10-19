@@ -378,6 +378,238 @@
     }
   }
 
+  // ---- Challenge / 题库对战 ----
+  const gameBoardEl = document.getElementById("game-board");
+  const gameStatusEl = document.getElementById("game-status");
+  const gameInput = document.getElementById("game-input");
+  const gameRecList = document.getElementById("game-rec-list");
+  const gameHard = document.getElementById("game-hard");
+  const btnGameNew = document.getElementById("btn-game-new");
+  const btnGameGuess = document.getElementById("btn-game-guess");
+  const btnGameAutoStep = document.getElementById("btn-game-auto-step");
+  const btnGameAutoAll = document.getElementById("btn-game-auto-all");
+  let gameBusy = false;
+  let gameActive = false;
+
+  function buildGameBoard() {
+    gameBoardEl.innerHTML = "";
+    for (let r = 0; r < ROWS; r++) {
+      const row = document.createElement("div");
+      row.className = "row";
+      for (let c = 0; c < COLS; c++) {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        tile.dataset.grow = String(r);
+        tile.dataset.gcol = String(c);
+        row.appendChild(tile);
+      }
+      gameBoardEl.appendChild(row);
+    }
+  }
+
+  function gameTile(r, c) {
+    return gameBoardEl.querySelector(`.tile[data-grow="${r}"][data-gcol="${c}"]`);
+  }
+
+  function paintGameBoard(history, draftWord) {
+    for (let r = 0; r < ROWS; r++) {
+      for (let c = 0; c < COLS; c++) {
+        const tile = gameTile(r, c);
+        tile.className = "tile";
+        tile.textContent = "";
+      }
+    }
+    history.forEach((h, r) => {
+      for (let c = 0; c < COLS; c++) {
+        const tile = gameTile(r, c);
+        tile.textContent = h.guess[c] || "";
+        tile.classList.add("filled", h.colors[c] || "b", "pop");
+      }
+    });
+    const draftRow = history.length;
+    if (draftRow < ROWS && draftWord) {
+      const word = draftWord.toUpperCase().padEnd(5).slice(0, 5);
+      for (let c = 0; c < COLS; c++) {
+        const ch = word[c] && word[c] !== " " ? word[c] : "";
+        if (!ch) continue;
+        const tile = gameTile(draftRow, c);
+        tile.textContent = ch;
+        tile.classList.add("filled", "pop");
+      }
+    }
+  }
+
+  function setGameControls(enabled) {
+    gameInput.disabled = !enabled;
+    btnGameGuess.disabled = !enabled;
+    btnGameAutoStep.disabled = !enabled;
+    btnGameAutoAll.disabled = !enabled;
+  }
+
+  function renderGameRecs(recs) {
+    gameRecList.innerHTML = "";
+    if (!recs || !recs.length) {
+      gameRecList.innerHTML = '<p class="side-note">本局结束后不再给出建议。</p>';
+      return;
+    }
+    const maxEnt = Math.max(...recs.map((r) => r.entropy), 0.001);
+    recs.forEach((r) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "rec";
+      btn.innerHTML = `
+        <span class="word">${r.word}</span>
+        <span class="bar-track"><span class="bar" style="width:${(r.entropy / maxEnt) * 100}%"></span></span>
+        <span class="meta">${r.entropy.toFixed(2)}${r.in_answers ? '<span class="tag">答案</span>' : '<span class="tag">探测</span>'}</span>
+      `;
+      btn.addEventListener("click", () => {
+        if (gameInput.disabled) return;
+        gameInput.value = r.word;
+        paintGameBoard(JSON.parse(gameBoardEl.dataset.historyJson || "[]"), gameInput.value);
+        gameInput.focus();
+      });
+      gameRecList.appendChild(btn);
+    });
+  }
+
+  function applyGameState(state) {
+    gameActive = !!state.active || !!state.history;
+    const history = state.history || [];
+    gameBoardEl.dataset.historyJson = JSON.stringify(history);
+
+    document.getElementById("gm-used").textContent = String(state.guesses_used ?? history.length);
+    document.getElementById("gm-left").textContent = String(
+      state.guesses_left ?? Math.max(0, 6 - history.length)
+    );
+    document.getElementById("gm-rem").textContent =
+      state.remaining != null ? String(state.remaining) : "—";
+
+    if (state.won) {
+      gameStatusEl.textContent = `猜中了！答案 ${state.answer} · ${history.length} 步`;
+      gameStatusEl.className = "status solved";
+      document.getElementById("gm-state").textContent = "胜利";
+      setGameControls(false);
+    } else if (state.lost) {
+      gameStatusEl.textContent = `未猜出。答案是 ${state.answer}`;
+      gameStatusEl.className = "status lost";
+      document.getElementById("gm-state").textContent = "失败";
+      setGameControls(false);
+    } else if (!gameActive && !(state.history && state.history.length)) {
+      gameStatusEl.textContent = "点击「抽一题」从答案库随机出题。";
+      gameStatusEl.className = "status muted";
+      document.getElementById("gm-state").textContent = "未开始";
+      setGameControls(false);
+    } else {
+      gameStatusEl.textContent = `第 ${state.turn} 步 · 还剩 ${state.guesses_left} 次机会`;
+      gameStatusEl.className = "status";
+      document.getElementById("gm-state").textContent = "进行中";
+      setGameControls(true);
+      if (state.recommendations && state.recommendations[0] && !gameInput.value) {
+        gameInput.value = state.recommendations[0].word;
+      }
+    }
+
+    paintGameBoard(history, gameInput.disabled ? "" : gameInput.value);
+    renderGameRecs(state.recommendations || []);
+  }
+
+  async function gameNew() {
+    if (gameBusy) {
+      gameStatusEl.textContent = "正在处理上一操作，请稍候…";
+      gameStatusEl.className = "status muted";
+      return;
+    }
+    gameBusy = true;
+    if (btnGameNew) btnGameNew.disabled = true;
+    gameStatusEl.textContent = "正在抽题…";
+    gameStatusEl.className = "status muted";
+    try {
+      const state = await api("/api/game/new", {
+        method: "POST",
+        body: JSON.stringify({ hard: gameHard.checked }),
+      });
+      gameInput.value = "";
+      applyGameState({ ...state, active: true });
+    } catch (e) {
+      gameStatusEl.textContent = e.message || "抽题失败";
+      gameStatusEl.className = "status";
+    } finally {
+      gameBusy = false;
+      if (btnGameNew) btnGameNew.disabled = false;
+    }
+  }
+
+  async function gameGuess() {
+    if (gameBusy) return;
+    const guess = gameInput.value.trim();
+    if (guess.length !== 5) {
+      gameStatusEl.textContent = "请输入 5 个字母";
+      gameStatusEl.className = "status";
+      return;
+    }
+    gameBusy = true;
+    try {
+      const state = await api("/api/game/guess", {
+        method: "POST",
+        body: JSON.stringify({ guess }),
+      });
+      gameInput.value = "";
+      applyGameState({ ...state, active: true });
+    } catch (e) {
+      gameStatusEl.textContent = e.message;
+      gameStatusEl.className = "status";
+    } finally {
+      gameBusy = false;
+    }
+  }
+
+  async function gameAutoStep() {
+    if (gameBusy) return;
+    gameBusy = true;
+    try {
+      const state = await api("/api/game/auto-step", {
+        method: "POST",
+        body: "{}",
+      });
+      gameInput.value = "";
+      applyGameState({ ...state, active: true });
+    } catch (e) {
+      gameStatusEl.textContent = e.message;
+      gameStatusEl.className = "status";
+    } finally {
+      gameBusy = false;
+    }
+  }
+
+  async function gameAutoAll() {
+    if (gameBusy) return;
+    gameBusy = true;
+    btnGameAutoAll.disabled = true;
+    gameStatusEl.textContent = "系统求解中…";
+    try {
+      const state = await api("/api/game/auto-all", {
+        method: "POST",
+        body: "{}",
+      });
+      gameInput.value = "";
+      applyGameState({ ...state, active: true });
+    } catch (e) {
+      gameStatusEl.textContent = e.message;
+      gameStatusEl.className = "status";
+    } finally {
+      gameBusy = false;
+    }
+  }
+
+  async function loadGameState() {
+    try {
+      const state = await api("/api/game/state");
+      if (state.active) applyGameState(state);
+    } catch (_) {
+      /* ignore */
+    }
+  }
+
   // tabs
   document.querySelectorAll(".tab").forEach((tab) => {
     tab.addEventListener("click", () => {
@@ -385,6 +617,7 @@
       document.querySelectorAll(".panel").forEach((p) => p.classList.remove("active"));
       tab.classList.add("active");
       document.getElementById(`panel-${tab.dataset.tab}`).classList.add("active");
+      if (tab.dataset.tab === "game") loadGameState();
     });
   });
 
@@ -398,7 +631,24 @@
   hardMode.addEventListener("change", newGame);
   btnSim.addEventListener("click", runSim);
 
+  gameInput.addEventListener("input", () => {
+    const v = gameInput.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 5);
+    gameInput.value = v;
+    paintGameBoard(JSON.parse(gameBoardEl.dataset.historyJson || "[]"), v);
+  });
+  gameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") gameGuess();
+  });
+  btnGameNew.addEventListener("click", gameNew);
+  btnGameGuess.addEventListener("click", gameGuess);
+  btnGameAutoStep.addEventListener("click", gameAutoStep);
+  btnGameAutoAll.addEventListener("click", gameAutoAll);
+  gameHard.addEventListener("change", () => {
+    if (gameActive) gameNew();
+  });
+
   buildBoard();
+  buildGameBoard();
   refresh().catch((e) => {
     statusEl.textContent = e.message;
   });

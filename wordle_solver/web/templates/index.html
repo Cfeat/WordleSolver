@@ -9,7 +9,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
-  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}?v=3" defer></script>
 </head>
 <body>
   <div class="bg-grid" aria-hidden="true"></div>
@@ -22,6 +22,7 @@
     <p class="tagline">信息熵辅助 · 平均步数优先</p>
     <nav class="tabs" role="tablist">
       <button class="tab active" data-tab="play" type="button">辅助猜词</button>
+      <button class="tab" data-tab="game" type="button">题库对战</button>
       <button class="tab" data-tab="sim" type="button">模拟统计</button>
     </nav>
   </header>
@@ -69,6 +70,58 @@
 
           <h2 class="mt">剩余候选 <span id="cand-count"></span></h2>
           <div id="candidates" class="candidates"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="panel-game" class="panel">
+      <div class="play-layout">
+        <div class="board-col">
+          <div class="toolbar">
+            <label class="toggle">
+              <input type="checkbox" id="game-hard" />
+              <span>Hard Mode</span>
+            </label>
+            <div class="toolbar-actions">
+              <button type="button" id="btn-game-new" class="ghost">抽一题</button>
+            </div>
+          </div>
+
+          <div id="game-status" class="status muted">点击「抽一题」从答案库随机出题。</div>
+          <div id="game-board" class="board" aria-label="对战棋盘"></div>
+
+          <div class="compose">
+            <input
+              id="game-input"
+              maxlength="5"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="输入你的猜测"
+              aria-label="对战猜测"
+              disabled
+            />
+            <button type="button" id="btn-game-guess" class="primary" disabled>提交猜测</button>
+          </div>
+
+          <div class="game-actions">
+            <button type="button" id="btn-game-auto-step" class="ghost" disabled>系统猜一步</button>
+            <button type="button" id="btn-game-auto-all" class="ghost" disabled>系统自动通关</button>
+          </div>
+          <p class="hint">答案对玩家隐藏；提交后自动上色。也可让求解器代打。</p>
+        </div>
+
+        <aside class="side">
+          <h2>本局信息</h2>
+          <div id="game-metrics" class="metrics">
+            <div class="metric"><span class="label">状态</span><span class="value" id="gm-state">未开始</span></div>
+            <div class="metric"><span class="label">已用</span><span class="value" id="gm-used">0</span></div>
+            <div class="metric"><span class="label">剩余机会</span><span class="value" id="gm-left">6</span></div>
+            <div class="metric"><span class="label">求解器候选</span><span class="value" id="gm-rem">—</span></div>
+          </div>
+
+          <h2 class="mt">求解器建议</h2>
+          <p class="side-note">可点选填入；「系统猜一步」会采用当前最优推荐。</p>
+          <div id="game-rec-list" class="rec-list"></div>
         </aside>
       </div>
     </section>

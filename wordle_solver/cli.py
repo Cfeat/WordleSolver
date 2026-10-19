@@ -159,6 +159,59 @@ def cmd_web(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_challenge(args: argparse.Namespace) -> int:
+    from wordle_solver.challenge import ChallengeGame
+
+    game = ChallengeGame.draw(hard_mode=args.hard)
+    print("题库对战：已抽题（答案隐藏）")
+    if args.hard:
+        print("Hard Mode: 已开启")
+    if args.auto:
+        while not game.finished:
+            before = len(game.guesses)
+            game.auto_step()
+            g = game.guesses[-1]
+            print(f"  [{before + 1}] {g.upper()} -> {pattern_to_colors(game.patterns[-1])}")
+        if game.won:
+            print(f"系统猜中 {game.answer.upper()}，共用 {len(game.guesses)} 步")
+            return 0
+        print(f"系统未猜出，答案是 {game.answer.upper()}")
+        return 1
+
+    print("输入 5 字母猜测；命令: hint / auto / quit")
+    while not game.finished:
+        snap = game.snapshot()
+        print(f"—— 第 {snap['turn']} 步 | 剩余机会 {snap['guesses_left']} ——")
+        raw = input("> ").strip().lower()
+        if raw in ("q", "quit", "exit"):
+            print(f"已退出。答案是 {game.answer.upper()}")
+            return 0
+        if raw == "hint":
+            for r in snap["recommendations"]:
+                tag = "答案池" if r["in_answers"] else "探测"
+                print(f"  {r['word']}  熵={r['entropy']:.3f}  [{tag}]")
+            continue
+        if raw == "auto":
+            result = game.auto_step()
+            if "error" in result:
+                print(result["error"])
+                continue
+            g = game.guesses[-1]
+            print(f"  系统: {g.upper()} -> {pattern_to_colors(game.patterns[-1])}")
+            continue
+        result = game.submit(raw)
+        if "error" in result:
+            print(result["error"])
+            continue
+        print(f"  {raw.upper()} -> {pattern_to_colors(game.patterns[-1])}")
+
+    if game.won:
+        print(f"猜中！答案 {game.answer.upper()}，{len(game.guesses)} 步")
+        return 0
+    print(f"失败。答案是 {game.answer.upper()}")
+    return 1
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="wordle-solver",
@@ -196,6 +249,11 @@ def build_parser() -> argparse.ArgumentParser:
     web.add_argument("--port", type=int, default=5000)
     web.add_argument("--debug", action="store_true")
     web.set_defaults(func=cmd_web)
+
+    ch = sub.add_parser("challenge", help="题库抽题对战（手猜或系统代猜）")
+    ch.add_argument("--hard", action="store_true")
+    ch.add_argument("--auto", action="store_true", help="系统自动通关")
+    ch.set_defaults(func=cmd_challenge)
 
     return p
 

@@ -3,5 +3,47 @@
   "entropy": 5.87830295649317,
   "is_answer": true,
   "answer_count": 2309,
-  "guess_pool": 2309
+  "guess_pool": 2309,
+  "top": [
+    {
+      "word": "raise",
+      "entropy": 5.87830295649317,
+      "is_answer": true
+    },
+    {
+      "word": "slate",
+      "entropy": 5.855819244109515,
+      "is_answer": true
+    },
+    {
+      "word": "crate",
+      "entropy": 5.835215982633283,
+      "is_answer": true
+    },
+    {
+      "word": "irate",
+      "entropy": 5.8327988809409055,
+      "is_answer": true
+    },
+    {
+      "word": "trace",
+      "entropy": 5.8304291080797555,
+      "is_answer": true
+    },
+    {
+      "word": "arise",
+      "entropy": 5.821023459282913,
+      "is_answer": true
+    },
+    {
+      "word": "stare",
+      "entropy": 5.806888622249769,
+      "is_answer": true
+    },
+    {
+      "word": "snare",
+      "entropy": 5.768678157325963,
+      "is_answer": true
+    }
+  ]
 }
