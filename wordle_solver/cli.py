@@ -152,6 +152,13 @@ def cmd_opener(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_web(args: argparse.Namespace) -> int:
+    from wordle_solver.web.app import run
+
+    run(host=args.host, port=args.port, debug=args.debug)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(
         prog="wordle-solver",
@@ -183,6 +190,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="只用答案词表作猜测池（更快，略次优）",
     )
     opener.set_defaults(func=cmd_opener)
+
+    web = sub.add_parser("web", help="启动可视化网页界面")
+    web.add_argument("--host", default="127.0.0.1")
+    web.add_argument("--port", type=int, default=5000)
+    web.add_argument("--debug", action="store_true")
+    web.set_defaults(func=cmd_web)
 
     return p
 

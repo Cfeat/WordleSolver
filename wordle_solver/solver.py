@@ -57,9 +57,16 @@ class Solver:
         # First move is identical with/without Hard Mode (no constraints yet).
         if not self.history:
             opener = self._cached_opener()
-            if opener:
+            if opener and top_k <= 1:
                 ent = self._entropy(opener, self.candidates)
                 return [(opener, ent, opener in self._answer_set)]
+            # Rank answer pool for a fast top-K list (full guess pool is slow).
+            scored = self._rank(list(self.answers), self.candidates)
+            if opener:
+                scored = [s for s in scored if s[0] != opener]
+                ent = self._entropy(opener, self.candidates)
+                scored.insert(0, (opener, ent, opener in self._answer_set))
+            return scored[:top_k]
 
         pool = self._guess_pool()
         scored = self._rank(pool, self.candidates)

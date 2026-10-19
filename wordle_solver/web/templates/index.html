@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>WordleSolver</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}" />
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="{{ url_for('static', filename='app.js') }}" defer></script>
+</head>
+<body>
+  <div class="bg-grid" aria-hidden="true"></div>
+
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark">W</span>
+      <h1>WordleSolver</h1>
+    </div>
+    <p class="tagline">信息熵辅助 · 平均步数优先</p>
+    <nav class="tabs" role="tablist">
+      <button class="tab active" data-tab="play" type="button">辅助猜词</button>
+      <button class="tab" data-tab="sim" type="button">模拟统计</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="panel-play" class="panel active">
+      <div class="play-layout">
+        <div class="board-col">
+          <div class="toolbar">
+            <label class="toggle">
+              <input type="checkbox" id="hard-mode" />
+              <span>Hard Mode</span>
+            </label>
+            <div class="toolbar-actions">
+              <button type="button" id="btn-undo" class="ghost">撤销</button>
+              <button type="button" id="btn-new" class="ghost">新开一局</button>
+            </div>
+          </div>
+
+          <div id="status" class="status">加载中…</div>
+          <div id="board" class="board" aria-label="猜词棋盘"></div>
+
+          <div class="compose">
+            <input
+              id="guess-input"
+              maxlength="5"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="输入猜测或点推荐"
+              aria-label="猜测单词"
+            />
+            <button type="button" id="btn-submit" class="primary">提交反馈</button>
+          </div>
+          <p class="hint">输入 5 字母后，点击格子循环 灰 → 黄 → 绿，再提交。</p>
+        </div>
+
+        <aside class="side">
+          <h2>推荐猜测</h2>
+          <p class="side-note">按信息熵排序；条越长越能压缩候选。</p>
+          <div id="rec-list" class="rec-list"></div>
+          <canvas id="entropy-chart" height="220"></canvas>
+
+          <h2 class="mt">候选收缩</h2>
+          <canvas id="shrink-chart" height="160"></canvas>
+
+          <h2 class="mt">剩余候选 <span id="cand-count"></span></h2>
+          <div id="candidates" class="candidates"></div>
+        </aside>
+      </div>
+    </section>
+
+    <section id="panel-sim" class="panel">
+      <div class="sim-card">
+        <h2>批量模拟</h2>
+        <p class="side-note">在答案词表上跑求解器，看步数分布与平均表现。</p>
+        <div class="sim-controls">
+          <label>
+            词数
+            <select id="sim-limit">
+              <option value="50">50</option>
+              <option value="100" selected>100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+              <option value="">全部 (~2309)</option>
+            </select>
+          </label>
+          <label class="toggle">
+            <input type="checkbox" id="sim-hard" />
+            <span>Hard Mode</span>
+          </label>
+          <button type="button" id="btn-sim" class="primary">开始模拟</button>
+        </div>
+        <p id="sim-status" class="status muted"></p>
+        <div id="sim-metrics" class="metrics hidden"></div>
+        <div class="sim-charts">
+          <canvas id="dist-chart" height="260"></canvas>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <span>本地运行 · 数据不离开本机</span>
+  </footer>
+</body>
+</html>
